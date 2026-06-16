@@ -27,7 +27,8 @@ scope with OIDC protocol mappers, and an identity provider — all managed by Te
 7. An OIDC identity provider (+ a mapper)
 8. Reference existing Keycloak objects with `data`
 9. Package a public SPA client as a reusable module
-10. Inspect state, see drift, clean up
+10. A custom browser login flow (split username / password)
+11. Inspect state, see drift, clean up
 
 > Convention: work in the **`lab/student/`** folder — create each file there as you reach its
 > step, and run the `terraform` commands from inside it. Terraform loads every `*.tf` file
@@ -623,7 +624,98 @@ Verify: realm → Clients → `admin-spa` (public, PKCE on, `acme` as a default 
 
 ---
 
-## Step 10 — Inspect state, see drift, clean up
+## Step 10 — A custom browser login flow (split username / password)
+
+Authentication flows are a tree: a top-level **flow** holds **executions** (authenticators)
+and **subflows**. Let's build a browser flow that asks for the username first and the
+password on a **separate** screen (Keycloak's "identity-first" login) — using the
+`auth-username-form` and `auth-password-form` authenticators instead of the combined
+`auth-username-password-form`.
+
+The structure we want:
+
+```
+browser-2step                  (top-level flow)
+├── Cookie          ALTERNATIVE   (auth-cookie)
+└── forms           ALTERNATIVE   (subflow)
+    ├── Username Form  REQUIRED   (auth-username-form)
+    └── Password Form  REQUIRED   (auth-password-form)
+```
+
+**`auth_flow.tf`**:
+
+```hcl
+resource "keycloak_authentication_flow" "browser_2step" {
+  realm_id    = keycloak_realm.workshop.id
+  alias       = "browser-2step"
+  description = "Browser flow with separate username and password steps"
+}
+
+# Re-use an existing session if present.
+resource "keycloak_authentication_execution" "cookie" {
+  realm_id          = keycloak_realm.workshop.id
+  parent_flow_alias = keycloak_authentication_flow.browser_2step.alias
+  authenticator     = "auth-cookie"
+  requirement       = "ALTERNATIVE"
+}
+
+# Subflow holding the two form steps.
+resource "keycloak_authentication_subflow" "forms" {
+  realm_id          = keycloak_realm.workshop.id
+  parent_flow_alias = keycloak_authentication_flow.browser_2step.alias
+  alias             = "forms-2step"
+  provider_id       = "basic-flow"
+  requirement       = "ALTERNATIVE"
+
+  depends_on = [keycloak_authentication_execution.cookie]
+}
+
+# Step 1 — ask for the username only.
+resource "keycloak_authentication_execution" "username_form" {
+  realm_id          = keycloak_realm.workshop.id
+  parent_flow_alias = keycloak_authentication_subflow.forms.alias
+  authenticator     = "auth-username-form"
+  requirement       = "REQUIRED"
+}
+
+# Step 2 — ask for the password on a separate screen.
+resource "keycloak_authentication_execution" "password_form" {
+  realm_id          = keycloak_realm.workshop.id
+  parent_flow_alias = keycloak_authentication_subflow.forms.alias
+  authenticator     = "auth-password-form"
+  requirement       = "REQUIRED"
+
+  depends_on = [keycloak_authentication_execution.username_form]
+}
+
+# Make this the realm's browser flow.
+resource "keycloak_authentication_bindings" "browser" {
+  realm_id     = keycloak_realm.workshop.id
+  browser_flow = keycloak_authentication_flow.browser_2step.alias
+}
+```
+
+```bash
+terraform apply
+```
+
+> **Order matters, and Terraform parallelises by default.** The `depends_on` lines force the
+> executions to be created in sequence — Cookie before the subflow, Username before Password.
+> Without them the steps can land in the wrong order. (The bfd `master` realm builds its
+> custom 2FA browser flow exactly this way.)
+
+Verify: sign out, then open
+<http://localhost:18080/realms/workshop/account> — you now enter the **username**, click
+**Next**, and land on a **separate password** screen. In the admin console,
+Authentication → Flows shows `browser-2step` bound as the **browser** flow.
+
+> ⚠️ Binding a broken flow can lock users out of the realm. This one is complete (a Cookie
+> alternative plus a required username + password subflow), so login keeps working — and the
+> `master`-realm admin can always fix a realm's flow binding if needed.
+
+---
+
+## Step 11 — Inspect state, see drift, clean up
 
 **Outputs** — create **`outputs.tf`**:
 
