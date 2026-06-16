@@ -1,0 +1,24 @@
+# Minimal Keycloak 26.6.3 for the Terraform follow-along.
+# Dev mode: in-memory H2 database, HTTP only, no TLS. Data is wiped on `down`
+# (or on container recreation) — perfect for a repeatable workshop.
+#
+#   docker compose up -d        # start
+#   docker compose logs -f      # watch until "Running the server in development mode"
+#   docker compose down         # stop and discard
+#
+# Admin console: http://localhost:18080  (admin / admin)
+
+services:
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.6.3
+    container_name: tf-workshop-keycloak
+    command: start-dev
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_HEALTH_ENABLED: "true"
+    volumes:
+      - ./data/keycloak:/opt/keycloak/data:z
+    ports:
+      - "18080:8080"   # HTTP / admin console & API
+      - "19000:9000"   # management (health, metrics)
