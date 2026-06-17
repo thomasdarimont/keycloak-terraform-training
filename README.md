@@ -4,6 +4,11 @@ A hands-on, build-it-yourself example. You start with an **empty folder** and a 
 Keycloak, and add one file at a time until you have a realm, two clients, a custom client
 scope with OIDC protocol mappers, and an identity provider — all managed by Terraform.
 
+We use the [Keycloak provider](https://registry.terraform.io/providers/keycloak/keycloak/latest)
+for Terraform.
+The Keycloak Terraform Provider documentation is
+[here](https://registry.terraform.io/providers/keycloak/keycloak/latest/docs).
+
 **This folder:**
 
 - `lab/student/` — **you build here**, following the steps below.

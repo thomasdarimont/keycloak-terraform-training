@@ -5,6 +5,7 @@
     <content url="file://$MODULE_DIR$">
       <excludeFolder url="file://$MODULE_DIR$/lab/solution/.terraform" />
       <excludeFolder url="file://$MODULE_DIR$/lab/student/.terraform" />
+      <excludeFolder url="file://$MODULE_DIR$/scratch/student/.terraform" />
     </content>
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
