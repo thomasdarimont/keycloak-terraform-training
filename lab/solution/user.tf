@@ -11,4 +11,8 @@ resource "keycloak_user" "test" {
     value     = "test"
     temporary = false
   }
+
+  attributes = {
+    "department": "R&D"
+  }
 }
